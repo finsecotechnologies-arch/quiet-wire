@@ -1,0 +1,49 @@
+# Fetches the news on GitHub's servers every 30 minutes and publishes the reader to GitHub Pages,
+# so it works on any phone without your Mac being on.
+name: Publish news
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"   # every 30 min, off the hour when GitHub's scheduler is busiest
+  workflow_dispatch:          # "Run workflow" button in the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch feeds and build the site
+        run: python3 server.py --build site
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # GitHub pauses scheduled workflows in repos with no activity for 60 days.
+      # Re-enabling the workflow through the API resets that timer without adding commits.
+      - name: Keep the schedule running
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/publish.yml/enable"

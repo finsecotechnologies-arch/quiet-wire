@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quiet Wire</title>
+<meta name="description" content="Headlines only. The stories most outlets are carrying, without the feed.">
+<meta name="qw-data" content="/api/news">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Quiet Wire">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1116" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<style>
+/* Layout: one reading column under a sticky section bar; each story is ranked by how many outlets carry it,
+   shown as a five-dot coverage meter. No images, no autoplay, no endless scroll. */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --ink: #131922;
+  --muted: #566070;
+  --faint: #838d9b;
+  --line: #dce1e8;
+  --accent: #2450b8;
+  --accent-ink: #ffffff;
+  --warn: #9a5b00;
+  --font-head: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1116;
+    --surface: #151b23;
+    --ink: #e5e9ef;
+    --muted: #9ba5b3;
+    --faint: #6b7584;
+    --line: #242c37;
+    --accent: #8fb0ff;
+    --accent-ink: #0d1116;
+    --warn: #e0a64a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1116; --surface: #151b23; --ink: #e5e9ef; --muted: #9ba5b3; --faint: #6b7584;
+  --line: #242c37; --accent: #8fb0ff; --accent-ink: #0d1116; --warn: #e0a64a; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Masthead */
+.mast {
+  display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px;
+  padding-block: 28px 14px;
+}
+.brand {
+  margin: 0;
+  font-family: var(--font-head); font-weight: 600; font-size: 30px; line-height: 1.1; letter-spacing: -0.015em;
+}
+.dateline { margin: 4px 0 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 8px; padding: 7px 13px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.btn:hover { border-color: var(--faint); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* Filters panel */
+.panel { padding-block: 0 16px; }
+.panel-inner {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; display: grid; gap: 12px;
+}
+.panel label.title { font-weight: 600; font-size: 14px; }
+.panel .hint { margin: -8px 0 0; color: var(--muted); font-size: 13px; }
+.panel textarea {
+  width: 100%; resize: vertical; min-height: 64px; font: inherit; font-size: 14px;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.panel-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+
+/* Section bar */
+.tabs-bar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-block: 8px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; color: var(--muted);
+  padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.tab .count { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+
+/* Stories */
+.intro { margin: 0; padding-block: 18px 2px; color: var(--muted); font-size: 13.5px; max-width: 62ch; }
+.stories { list-style: none; margin: 0; padding: 0; }
+.story { display: grid; gap: 6px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.cov {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+}
+.dots { display: inline-flex; gap: 3px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.dots i.on { background: var(--accent); }
+.story h2 {
+  margin: 0;
+  font-family: var(--font-head); font-weight: 600; font-size: 21px; line-height: 1.25; letter-spacing: -0.005em;
+  text-wrap: balance;
+}
+.story.big h2 { font-size: 24px; }
+.story h2 a { color: inherit; text-decoration: none; }
+.story h2 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.summary {
+  margin: 0; color: var(--muted); max-width: 65ch;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; color: var(--faint); }
+.meta .src { color: var(--ink); font-weight: 500; }
+.also {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--accent); font-size: 13px; font-weight: 500;
+}
+.also { display: inline-flex; align-items: center; gap: 7px; }
+.also::after {
+  content: ""; width: 5px; height: 5px; margin-top: -3px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
+}
+.also[aria-expanded="true"]::after { margin-top: 3px; transform: rotate(-135deg); }
+.others {
+  list-style: none; margin: 6px 0 0; padding: 12px 14px; display: grid; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+.others .osrc { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
+.others a { color: var(--ink); text-decoration: none; }
+.others a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.story.read h2 a, .story.read .meta .src { color: var(--faint); }
+.story.read .summary { opacity: .7; }
+.story.read .dots i.on { opacity: .5; }
+
+/* Loading, end, footer */
+.skeleton { display: grid; gap: 10px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.skeleton span { height: 12px; border-radius: 6px; background: var(--line); }
+.skeleton span:nth-child(1) { width: 22%; height: 9px; }
+.skeleton span:nth-child(2) { width: 88%; height: 18px; }
+.skeleton span:nth-child(3) { width: 64%; }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton span { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+}
+.end { display: grid; justify-items: center; gap: 10px; text-align: center; padding-block: 40px 28px; color: var(--muted); }
+.end strong { font-family: var(--font-head); font-size: 23px; font-weight: 600; color: var(--ink); }
+.end p { margin: 0; max-width: 52ch; }
+.end .small { font-size: 13px; color: var(--faint); }
+.notice { color: var(--warn); }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 500; }
+footer { padding-block: 20px 56px; color: var(--faint); font-size: 12.5px; border-top: 1px solid var(--line); }
+footer p { margin: 0 0 8px; max-width: 70ch; }
+footer b { color: var(--muted); font-weight: 600; }
+
+@media (max-width: 480px) {
+  .brand { font-size: 26px; }
+  .story h2 { font-size: 19px; }
+  .story.big h2 { font-size: 21px; }
+}
+</style>
+</head>
+<body>
+
+<header class="wrap mast">
+  <div>
+    <h1 class="brand">Quiet Wire</h1>
+    <p class="dateline" id="dateline">Loading…</p>
+  </div>
+  <div class="actions">
+    <button id="filtersBtn" class="btn" aria-expanded="false" aria-controls="filters">Filters</button>
+    <button id="refresh" class="btn">Refresh</button>
+  </div>
+</header>
+
+<section id="filters" class="wrap panel" hidden>
+  <div class="panel-inner">
+    <label class="title" for="muted">Muted words</label>
+    <p class="hint">Hide any story whose headline or summary mentions one of these. Separate them with commas.</p>
+    <textarea id="muted" rows="2" placeholder="cricket, celebrity, box office"></textarea>
+    <div class="panel-row">
+      <label class="check"><input type="checkbox" id="hideRead"> Hide stories I've already opened</label>
+      <button id="forget" class="linkish" type="button">Forget opened stories</button>
+    </div>
+  </div>
+</section>
+
+<nav class="tabs-bar" aria-label="Sections">
+  <div class="wrap"><div class="tabs" role="tablist" id="tabs"></div></div>
+</nav>
+
+<main class="wrap">
+  <p class="intro" id="intro"></p>
+  <ol class="stories" id="list" aria-live="polite">
+    <li class="skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+    <li class="skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+    <li class="skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+  </ol>
+  <div class="end" id="end"></div>
+</main>
+
+<footer class="wrap" id="foot"></footer>
+
+<script>
+(() => {
+  const PAGE = 25;
+  const STALE_MS = 15 * 60 * 1000;
+  const $ = (id) => document.getElementById(id);
+  const DATA_URL = (document.querySelector('meta[name="qw-data"]') || {}).content || '/api/news';
+  const HOSTED = /\.json$/.test(DATA_URL); // hosted copy reads a published snapshot instead of the local server
+  let lastLoad = 0;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('qw:' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('qw:' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  let data = null, byId = new Map(), tabs = [];
+  let tab = (location.hash || '').slice(1) || store.get('tab', 'top');
+  let readList = store.get('read', []);
+  let read = new Set(readList);
+  let muted = store.get('muted', '');
+  let hideRead = store.get('hideRead', false);
+  const expanded = new Set();
+  const shown = {};
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const safeUrl = (u) => (/^https?:\/\//i.test(u) ? esc(u) : '#');
+
+  function ago(iso) {
+    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + ' min ago';
+    const h = Math.floor(mins / 60);
+    if (h < 24) return h + ' h ago';
+    const d = Math.floor(h / 24);
+    return d === 1 ? 'yesterday' : d + ' days ago';
+  }
+  function clock(iso) {
+    try {
+      return new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+    } catch (e) { return iso; }
+  }
+
+  // ---- filters
+  let mutedRe = null;
+  function buildMuted() {
+    const terms = muted.split(',').map((t) => t.trim()).filter(Boolean)
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    mutedRe = terms.length ? new RegExp('\\b(' + terms.join('|') + ')', 'i') : null;
+  }
+  const isMuted = (s) => !!mutedRe && mutedRe.test(s.title + ' ' + s.summary);
+  const isRead = (s) => s.urls.some((u) => read.has(u));
+  function markRead(s) {
+    for (const u of s.urls) if (!read.has(u)) { read.add(u); readList.push(u); }
+    if (readList.length > 4000) { readList = readList.slice(-3000); read = new Set(readList); }
+    store.set('read', readList);
+  }
+
+  // ---- tabs
+  function idsFor(t) {
+    if (!data) return [];
+    if (t === 'top') return data.top;
+    const sec = data.sections.find((x) => x.id === t);
+    return sec ? sec.order : [];
+  }
+  function visible(t) {
+    const all = idsFor(t).map((id) => byId.get(id)).filter(Boolean);
+    const out = [];
+    let mutedN = 0, readN = 0;
+    for (const s of all) {
+      if (isMuted(s)) { mutedN++; continue; }
+      if (hideRead && isRead(s)) { readN++; continue; }
+      out.push(s);
+    }
+    return { stories: out, mutedN, readN, total: all.length };
+  }
+  function unreadCount(t) { return visible(t).stories.filter((s) => !isRead(s)).length; }
+
+  function renderTabs() {
+    $('tabs').innerHTML = tabs.map((t) => {
+      const n = data ? unreadCount(t.id) : '';
+      return `<button class="tab" role="tab" id="tab-${t.id}" aria-selected="${t.id === tab}" data-tab="${t.id}">${esc(t.label)}${data ? `<span class="count">${n}</span>` : ''}</button>`;
+    }).join('');
+  }
+
+  function setTab(t, scroll) {
+    if (!tabs.some((x) => x.id === t)) t = 'top';
+    tab = t;
+    store.set('tab', t);
+    try { history.replaceState(null, '', '#' + t); } catch (e) {}
+    render();
+    if (scroll) window.scrollTo({ top: 0 });
+  }
+
+  // ---- stories
+  function storyHTML(s) {
+    const n = s.n, on = Math.min(n, 5);
+    const dots = Array.from({ length: 5 }, (_, i) => `<i class="${i < on ? 'on' : ''}"></i>`).join('');
+    const cov = n === 1 ? '1 outlet' : n + ' outlets';
+    const names = s.others.map((o) => o.source);
+    const open = expanded.has(s.id);
+    let alsoLabel = '';
+    if (names.length) alsoLabel = 'Also ' + names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');
+    const others = s.others.map((o) =>
+      `<li><span class="osrc">${esc(o.source)} · ${ago(o.time)}</span><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.title)}</a></li>`).join('');
+    return `<li class="story${isRead(s) ? ' read' : ''}${n >= 5 ? ' big' : ''}" data-id="${s.id}">
+      <div class="cov" title="Carried by ${cov}"><span class="dots" aria-hidden="true">${dots}</span><span>${cov}</span></div>
+      <h2><a href="${safeUrl(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></h2>
+      ${s.summary ? `<p class="summary">${esc(s.summary)}</p>` : ''}
+      <div class="meta"><span class="src">${esc(s.source)}</span><time datetime="${esc(s.time)}" title="${esc(clock(s.time))}">${ago(s.time)}</time>${names.length ? `<button class="also" type="button" aria-expanded="${open}" aria-controls="o-${s.id}" data-toggle="${s.id}">${esc(alsoLabel)}</button>` : ''}</div>
+      ${names.length ? `<ul class="others" id="o-${s.id}"${open ? '' : ' hidden'}>${others}</ul>` : ''}
+    </li>`;
+  }
+
+  function label(t) { return (tabs.find((x) => x.id === t) || {}).label || ''; }
+
+  function render() {
+    renderTabs();
+    if (!data) return;
+    const sec = data.sections.find((x) => x.id === tab);
+    const hours = sec ? sec.window_hours : data.window_hours;
+    $('intro').textContent = tab === 'top'
+      ? `The stories the most outlets are carrying right now, out of ${data.outlets} newsrooms.`
+      : `${label(tab)} from ${sec.sources.join(', ')}. Ranked by how many of them carry each story.`;
+
+    const v = visible(tab);
+    const limit = shown[tab] || PAGE;
+    $('list').innerHTML = v.stories.slice(0, limit).map(storyHTML).join('');
+
+    const left = v.stories.length - limit;
+    const hidden = [];
+    if (v.mutedN) hidden.push(`${v.mutedN} hidden by muted words`);
+    if (v.readN) hidden.push(`${v.readN} you've already opened`);
+    const hiddenLine = hidden.length ? `<p class="small">${esc(hidden.join(' · '))}</p>` : '';
+    if (left > 0) {
+      $('end').innerHTML = `<button class="btn" id="more" type="button">Show ${Math.min(PAGE, left)} more</button>
+        <p class="small">${left} lower-ranked ${left === 1 ? 'story' : 'stories'} left, mostly carried by a single outlet.</p>${hiddenLine}`;
+    } else {
+      const what = tab === 'top'
+        ? 'Those are the stories most newsrooms agree matter right now.'
+        : `That's every ${esc(label(tab))} story from the last ${hours} hours.`;
+      $('end').innerHTML = `<strong>You're caught up.</strong><p>${what}</p>${hiddenLine}
+        <button class="linkish" id="toTop" type="button">Back to top</button>`;
+    }
+  }
+
+  function renderFooter() {
+    if (!data) return;
+    const failed = data.feeds.filter((f) => !f.ok);
+    const secs = data.sections.map((s) => `<b>${esc(s.label)}</b> ${esc(s.sources.join(', '))}`).join(' · ');
+    $('foot').innerHTML = `<p>${secs}</p>
+      ${failed.length ? `<p class="notice">Didn't respond this time: ${esc(failed.map((f) => f.name + ' (' + f.section + ')').join(', '))}</p>` : ''}
+      <p>Headlines come from public RSS feeds and link to the original publisher. The only thing Quiet Wire remembers is which stories you've opened, and it keeps that in this browser.</p>`;
+  }
+
+  function renderDateline() {
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    $('dateline').textContent = data
+      ? `${today} · updated ${ago(data.generated_at)} · ${data.outlets} outlets`
+      : today;
+  }
+
+  // ---- load
+  async function load(fresh) {
+    const btn = $('refresh');
+    btn.disabled = true;
+    btn.textContent = 'Fetching…';
+    try {
+      const url = HOSTED ? DATA_URL + '?t=' + Date.now() : DATA_URL + (fresh ? '?fresh=1' : '');
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('The server answered ' + r.status);
+      data = await r.json();
+      lastLoad = Date.now();
+      byId = new Map(data.stories.map((s) => [s.id, s]));
+      tabs = [{ id: 'top', label: 'Top stories' }].concat(data.sections.map((s) => ({ id: s.id, label: s.label })));
+      if (!tabs.some((x) => x.id === tab)) tab = 'top';
+      for (const k of Object.keys(shown)) delete shown[k];
+      render();
+      renderFooter();
+    } catch (e) {
+      $('list').innerHTML = '';
+      $('end').innerHTML = `<strong>Couldn't load the news.</strong>
+        <p>${HOSTED ? 'Check your internet connection, then press Refresh.' : 'Check that <code>server.py</code> is still running in Terminal, then press Refresh.'}</p>
+        <p class="small">${esc(e.message || e)}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Refresh';
+      renderDateline();
+    }
+  }
+
+  // ---- events
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tab]');
+    if (b) setTab(b.dataset.tab, true);
+  });
+  $('tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = tabs.findIndex((t) => t.id === tab);
+    const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+    setTab(next.id, false);
+    const el = $('tab-' + next.id);
+    if (el) { el.focus(); el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  });
+
+  function onOpen(e) {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    if (e.type === 'auxclick' && e.button !== 1) return;
+    const li = a.closest('.story');
+    const s = li && byId.get(li.dataset.id);
+    if (!s) return;
+    markRead(s);
+    li.classList.add('read');
+    renderTabs();
+  }
+  $('list').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-toggle]');
+    if (t) {
+      const id = t.dataset.toggle, ul = $('o-' + id);
+      const open = !expanded.has(id);
+      open ? expanded.add(id) : expanded.delete(id);
+      t.setAttribute('aria-expanded', String(open));
+      if (ul) ul.hidden = !open;
+      return;
+    }
+    onOpen(e);
+  });
+  $('list').addEventListener('auxclick', onOpen);
+
+  $('end').addEventListener('click', (e) => {
+    if (e.target.id === 'more') { shown[tab] = (shown[tab] || PAGE) + PAGE; render(); }
+    if (e.target.id === 'toTop') window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  $('refresh').addEventListener('click', () => load(true));
+  $('filtersBtn').addEventListener('click', () => {
+    const p = $('filters'), open = p.hidden;
+    p.hidden = !open;
+    $('filtersBtn').setAttribute('aria-expanded', String(open));
+    if (open) $('muted').focus();
+  });
+  $('muted').value = muted;
+  $('hideRead').checked = hideRead;
+  let mutedTimer = 0;
+  $('muted').addEventListener('input', () => {
+    clearTimeout(mutedTimer);
+    mutedTimer = setTimeout(() => { muted = $('muted').value; store.set('muted', muted); buildMuted(); render(); }, 250);
+  });
+  $('hideRead').addEventListener('change', () => { hideRead = $('hideRead').checked; store.set('hideRead', hideRead); render(); });
+  $('forget').addEventListener('click', () => { readList = []; read = new Set(); store.set('read', []); render(); });
+  window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (t && t !== tab) setTab(t, true); });
+  // Reopening the app after a while picks up the latest news instead of showing this morning's.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (lastLoad && Date.now() - lastLoad > STALE_MS) load(false); else renderDateline();
+  });
+  setInterval(renderDateline, 60000);
+
+  buildMuted();
+  tabs = [{ id: 'top', label: 'Top stories' }];
+  renderTabs();
+  renderDateline();
+  load(false);
+})();
+</script>
+</body>
+</html>
