@@ -1,5 +1,5 @@
 {
-  "_note": "Add or remove outlets here. Each feed needs a name (the outlet) and an RSS/Atom URL. Feeds listed first are preferred as the headline when several outlets carry the same story. window_hours (optional) sets how far back a section looks; the default is 36. skip_title_patterns are regular expressions for headlines to drop, such as shopping guides. Restart server.py after editing.",
+  "_note": "Add or remove outlets here. Each feed needs a name (the outlet) and an RSS/Atom URL. Feeds listed first are preferred as the headline when several outlets carry the same story. window_hours (optional) sets how far back a section looks; the default is 36. top_min_outlets (optional) is how many outlets a story from that section needs before it can appear in Top stories; the default is 3. skip_title_patterns are regular expressions for headlines to drop, such as shopping guides and stock tips. Restart server.py after editing.",
   "skip_title_patterns": [
     "\\bbest\\b.{0,50}\\b(gifts?|deals?|buys?|presents?)\\b",
     "\\bgift guide\\b",
@@ -14,7 +14,23 @@
     "\\bwordle\\b",
     "\\bsudoku\\b",
     "\\bsponsored\\b",
-    "\\bdeal of the day\\b"
+    "\\bdeal of the day\\b",
+    "\\bstocks? to buy\\b",
+    "\\bstock recommendations?\\b",
+    "\\brecommends\\b.{0,40}\\bstocks?\\b",
+    "\\bstock ideas?\\b",
+    "\\bbroker.?s call\\b",
+    "\\bshould you (buy|sell|bid|apply|invest)\\b",
+    "\\b(time to buy|buy it now|last day to buy)\\b",
+    "\\bmultibaggers?\\b",
+    "\\bpenny stocks?\\b",
+    "\\bdo you own\\b",
+    "\\bGMP\\b",
+    "\\bshare price live updates?\\b",
+    "\\b(RSI|VWAP|MACD|DMAs?|marubozu)\\b",
+    "\\banalyst calls\\b",
+    "^\\d+ of the best\\b",
+    "^opinion\\s*[|:]"
   ],
   "sections": [
     {
@@ -118,6 +134,45 @@
           "url": "https://www.business-standard.com/rss/economy-102.rss"
         }
       ]
+    },
+    {
+      "id": "markets",
+      "label": "Markets",
+      "feeds": [
+        {
+          "name": "Business Standard",
+          "url": "https://www.business-standard.com/rss/markets-106.rss"
+        },
+        {
+          "name": "BusinessLine",
+          "url": "https://www.thehindubusinessline.com/markets/stock-markets/feeder/default.rss"
+        },
+        {
+          "name": "Mint",
+          "url": "https://www.livemint.com/rss/markets"
+        },
+        {
+          "name": "Economic Times",
+          "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"
+        },
+        {
+          "name": "WSJ",
+          "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"
+        },
+        {
+          "name": "CNBC",
+          "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839135"
+        },
+        {
+          "name": "CNBC",
+          "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069"
+        },
+        {
+          "name": "The Guardian",
+          "url": "https://www.theguardian.com/business/stock-markets/rss"
+        }
+      ],
+      "top_min_outlets": 5
     },
     {
       "id": "tech",

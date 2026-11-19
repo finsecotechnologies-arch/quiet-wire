@@ -319,6 +319,12 @@ footer b { color: var(--muted); font-weight: 600; }
       const n = data ? unreadCount(t.id) : '';
       return `<button class="tab" role="tab" id="tab-${t.id}" aria-selected="${t.id === tab}" data-tab="${t.id}">${esc(t.label)}${data ? `<span class="count">${n}</span>` : ''}</button>`;
     }).join('');
+    // On a phone the tab bar scrolls sideways; keep the open tab in view.
+    const bar = $('tabs'), act = bar.querySelector('[aria-selected="true"]');
+    if (act) {
+      const b = bar.getBoundingClientRect(), a = act.getBoundingClientRect();
+      if (a.left < b.left || a.right > b.right) bar.scrollLeft += a.left - b.left - 16;
+    }
   }
 
   function setTab(t, scroll) {

@@ -249,6 +249,8 @@ def parse_feed(data, feed, section, now, window_hours=WINDOW_HOURS, skip=None):
             summary = summary[len(title):].lstrip(" .:-–—|")
         if len(summary.split()) < 6:  # tags or bylines posing as a summary
             summary = ""
+        elif summary.startswith("Plus, ") or summary.startswith("Some of the best "):
+            summary = ""  # newsletter teasers about other stories (WSJ)
         summary = re.sub(r"\s*(Continue reading\.*|Read more\.*|\[…\]|\[\.\.\.\])\s*$", "", summary)
         items.append({
             "title": title,
@@ -277,12 +279,14 @@ taking talk talks than that the their them then there these they thing things th
 today told too top two under until up update updates us use very video videos vs want wants was watch way ways we
 week weeks well were what when where which while who whose why will with without women would year years yet you
 your opinion analysis explained explainer exclusive breaking watch listen podcast newsletter india indian world
-""".split())
+wall street
+""".split())  # "wall street" is in so many markets headlines that it tied unrelated stories together
 
 
 def tokens(text, limit=None):
     t = text.lower().replace("\u2019", "'").replace("\u2018", "'")
     t = re.sub(r"'s\b", "", t).replace("'", "")
+    t = re.sub(r"s&p\s*500", " ", t)  # an index name, not a "$500" figure
     words = re.findall(r"[a-z0-9]+", t)
     if limit:
         words = words[:limit]
@@ -475,10 +479,17 @@ def build():
                          "window_hours": windows[sid],
                          "order": [st["id"] for st in diversify(mine, score)]})
 
+    # A section can ask for more outlets before its stories reach Top stories
+    # (top_min_outlets), so routine market moves don't crowd out world news.
+    top_min = {sec["id"]: int(sec.get("top_min_outlets", 3)) for sec in cfg["sections"]}
+
+    def need(st):
+        return min(top_min[sid] for sid in st["sections"])
+
     ranked = sorted(stories, key=lambda st: -global_score(st))
-    top = [st for st in ranked if st["n"] >= 3][:TOP_COUNT]
+    top = [st for st in ranked if st["n"] >= need(st)][:TOP_COUNT]
     if len(top) < 8:
-        top += [st for st in ranked if st["n"] == 2][: 8 - len(top)]
+        top += [st for st in ranked if st["n"] == 2 and need(st) <= 3][: 8 - len(top)]
 
     for st in stories:
         st.pop("_local", None)
