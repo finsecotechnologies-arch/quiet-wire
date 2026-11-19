@@ -20,6 +20,8 @@ Then open http://localhost:8791. It uses only the Python standard library, so th
 
 ## The published site
 
+**Live at https://finsecotechnologies-arch.github.io/quiet-wire/** (code: https://github.com/finsecotechnologies-arch/quiet-wire). Search engines are asked not to index it.
+
 `.github/workflows/publish.yml` runs on GitHub every 30 minutes. It fetches the feeds with `python3 server.py --build site` and publishes the result to GitHub Pages, so the site stays fresh without your Mac. To publish right away, open the repo's **Actions** tab and choose **Publish news → Run workflow**. Pushing to `main` also publishes.
 
 If a run fails because no feed answered, the previous version stays up. GitHub can delay scheduled runs by a few minutes when it's busy.
